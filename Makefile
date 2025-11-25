@@ -7,7 +7,7 @@ GOARCHS := amd64 arm64
 LDFLAGS := -X github.com/inspektor-gadget/inspektor-gadget/internal/version.version=v0.46.0 \
            -X main.Version=$(IMAGE_TAG) \
            -w -s -extldflags "-static"
-GADGETS := fs-restrict kmod-restrict
+GADGETS := fs-restrict kmod-restrict ptrace-restrict
 
 .PHONY: build-all
 build-all: $(GADGETS) $(GOARCHS)

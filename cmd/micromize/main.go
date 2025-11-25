@@ -19,13 +19,17 @@ var fsRestrictGadgetBytes []byte
 //go:embed build/kmod-restrict.tar
 var kmodRestrictGadgetBytes []byte
 
+//go:embed build/ptrace-restrict.tar
+var ptraceRestrictGadgetBytes []byte
+
 // Version is the version of the gadgets to run.
 // It is set at build time via -ldflags.
 var Version = "latest"
 
 const (
-	fsRestrictGadgetImageRepo   = "ghcr.io/dorser/micromize/fs-restrict"
-	kmodRestrictGadgetImageRepo = "ghcr.io/dorser/micromize/kmod-restrict"
+	fsRestrictGadgetImageRepo     = "ghcr.io/dorser/micromize/fs-restrict"
+	kmodRestrictGadgetImageRepo   = "ghcr.io/dorser/micromize/kmod-restrict"
+	ptraceRestrictGadgetImageRepo = "ghcr.io/dorser/micromize/ptrace-restrict"
 )
 
 func main() {
@@ -71,6 +75,12 @@ func main() {
 	registry.Register("kmod-restrict", &gadget.GadgetConfig{
 		Bytes:     kmodRestrictGadgetBytes,
 		ImageName: fmt.Sprintf("%s:%s", kmodRestrictGadgetImageRepo, Version),
+		Params:    nil,
+	})
+
+	registry.Register("ptrace-restrict", &gadget.GadgetConfig{
+		Bytes:     ptraceRestrictGadgetBytes,
+		ImageName: fmt.Sprintf("%s:%s", ptraceRestrictGadgetImageRepo, Version),
 		Params:    nil,
 	})
 
