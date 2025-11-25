@@ -1,4 +1,9 @@
-# Micromize
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/logo/logo-horizontal.svg">
+    <img src="docs/images/logo/logo-horizontal.svg" alt="Micromize Logo" width="80%">
+  </picture>
+</h1>
 
 **Micromize** is a security hardening tool designed to reduce the visible kernel surface for containerized applications by leveraging [BPF LSM](https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_LSM/).
 
