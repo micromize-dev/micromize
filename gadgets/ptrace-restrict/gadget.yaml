@@ -1,0 +1,40 @@
+name: ptrace-restrict
+description: Restrict the use of ptrace
+homepageURL: 'TODO: Fill the gadget homepage URL'
+documentationURL: 'TODO: Fill the gadget documentation URL'
+sourceURL: 'TODO: Fill the gadget source code URL'
+datasources:
+  ptrace_restrict:
+    fields:
+      process:
+        annotations:
+          description: 'TODO: Fill field description'
+      timestamp_raw:
+        annotations:
+          description: 'TODO: Fill field description'
+params:
+  ebpf:
+    enforce:
+      key: enforce
+      defaultValue: "true"
+      description: Enforce the restriction (block) or just audit
+    targ_comm:
+      key: targ_comm
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    targ_gid:
+      key: targ_gid
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    targ_pid:
+      key: targ_pid
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    targ_tid:
+      key: targ_tid
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    targ_uid:
+      key: targ_uid
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
