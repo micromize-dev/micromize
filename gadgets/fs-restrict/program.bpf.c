@@ -34,6 +34,44 @@ is_file_in_container_rootfs(struct task_struct *task, struct file *file) {
   return true;
 }
 
+SEC("lsm/file_open")
+int BPF_PROG(micromize_file_open, struct file *file) {
+  if (gadget_should_discard_data_current())
+    return 0;
+
+  if (!(file->f_mode & FMODE_WRITE))
+    return 0;
+
+  struct path f_path = BPF_CORE_READ(file, f_path);
+  char *path_str = get_path_str(&f_path);
+  if (!path_str)
+    return 0;
+
+  char prefix[7];
+  if (bpf_probe_read_kernel_str(prefix, sizeof(prefix), path_str) < 0)
+    return 0;
+
+  if (__builtin_memcmp(prefix, "/proc", 5) == 0 &&
+      (prefix[5] == '/' || prefix[5] == '\0')) {
+    struct event *event;
+    event = gadget_reserve_buf(&events, sizeof(*event));
+    if (!event)
+      return 0;
+
+    gadget_process_populate(&event->process);
+    event->timestamp_raw = bpf_ktime_get_boot_ns();
+    bpf_probe_read_kernel_str(event->filename, sizeof(event->filename),
+                              path_str);
+
+    gadget_submit_buf(ctx, &events, event, sizeof(*event));
+
+    if (enforce)
+      return -EPERM;
+  }
+
+  return 0;
+}
+
 SEC("lsm/bprm_creds_for_exec")
 int BPF_PROG(micromize_bprm_creds_for_exec, struct linux_binprm *bprm) {
   struct task_struct *task;

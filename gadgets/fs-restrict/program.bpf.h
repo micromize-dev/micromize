@@ -8,6 +8,10 @@
 #define EPERM 1
 #endif
 
+#ifndef FMODE_WRITE
+#define FMODE_WRITE 0x2
+#endif
+
 struct event {
   gadget_timestamp timestamp_raw;
   struct gadget_process process;
