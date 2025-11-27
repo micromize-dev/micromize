@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"github.com/micromize-dev/micromize/internal/gadget"
 	"github.com/micromize-dev/micromize/internal/operators"
 	"github.com/micromize-dev/micromize/internal/runtime"
+	"github.com/micromize-dev/micromize/internal/utils"
 )
 
 //go:embed build/fs-restrict.tar
@@ -33,6 +35,16 @@ const (
 )
 
 func main() {
+	enforce := flag.Bool("enforce", true, "Enforce restrictions")
+	flag.Parse()
+
+	fmt.Println("Starting micromize...")
+	if *enforce {
+		fmt.Println("Enforcement enabled")
+	} else {
+		fmt.Println("Enforcement disabled (audit mode)")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -68,7 +80,8 @@ func main() {
 	registry := gadget.NewRegistry(contextManager, runtimeManager)
 
 	commonParams := map[string]string{
-		"operator.cli.output": "json",
+		"operator.cli.output":       "json",
+		"operator.oci.ebpf.enforce": fmt.Sprintf("%d", utils.BoolToInt(*enforce)),
 	}
 
 	registry.Register("fs-restrict", &gadget.GadgetConfig{

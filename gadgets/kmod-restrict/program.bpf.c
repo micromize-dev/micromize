@@ -9,7 +9,7 @@
 #include <gadget/filter.h>
 #include <gadget/macros.h>
 
-const volatile bool enforce = true;
+const volatile int enforce = 1;
 GADGET_PARAM(enforce);
 
 GADGET_TRACER_MAP(events, 1024 * 256);
