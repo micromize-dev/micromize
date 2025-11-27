@@ -12,6 +12,10 @@
 #define FMODE_WRITE 0x2
 #endif
 
+#ifndef PROC_SUPER_MAGIC
+#define PROC_SUPER_MAGIC 0x9fa0
+#endif
+
 struct event {
   gadget_timestamp timestamp_raw;
   struct gadget_process process;

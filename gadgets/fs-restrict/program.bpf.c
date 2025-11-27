@@ -42,17 +42,11 @@ int BPF_PROG(micromize_file_open, struct file *file) {
   if (!(file->f_mode & FMODE_WRITE))
     return 0;
 
-  struct path f_path = BPF_CORE_READ(file, f_path);
-  char *path_str = get_path_str(&f_path);
-  if (!path_str)
-    return 0;
+  struct inode *inode = BPF_CORE_READ(file, f_inode);
+  struct super_block *sb = BPF_CORE_READ(inode, i_sb);
+  unsigned long magic = BPF_CORE_READ(sb, s_magic);
 
-  char prefix[7];
-  if (bpf_probe_read_kernel_str(prefix, sizeof(prefix), path_str) < 0)
-    return 0;
-
-  if (__builtin_memcmp(prefix, "/proc", 5) == 0 &&
-      (prefix[5] == '/' || prefix[5] == '\0')) {
+  if (magic == PROC_SUPER_MAGIC) {
     struct event *event;
     event = gadget_reserve_buf(&events, sizeof(*event));
     if (!event)
@@ -60,8 +54,15 @@ int BPF_PROG(micromize_file_open, struct file *file) {
 
     gadget_process_populate(&event->process);
     event->timestamp_raw = bpf_ktime_get_boot_ns();
-    bpf_probe_read_kernel_str(event->filename, sizeof(event->filename),
-                              path_str);
+
+    struct path f_path = BPF_CORE_READ(file, f_path);
+    char *path_str = get_path_str(&f_path);
+    if (path_str) {
+      bpf_probe_read_kernel_str(event->filename, sizeof(event->filename),
+                                path_str);
+    } else {
+      event->filename[0] = '\0';
+    }
 
     gadget_submit_buf(ctx, &events, event, sizeof(*event));
 
