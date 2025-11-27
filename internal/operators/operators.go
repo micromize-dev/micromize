@@ -7,6 +7,7 @@ import (
 	_ "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/ebpf"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators/localmanager"
 	ocihandler "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/oci-handler"
+	clioperator "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/cli"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 )
 
@@ -27,4 +28,9 @@ func NewLocalManager() (igoperators.DataOperator, error) {
 // NewOCIHandler creates and returns the OCI handler operator
 func NewOCIHandler() igoperators.DataOperator {
 	return ocihandler.OciHandler
+}
+
+// NewCLIOperator creates and returns the CLI operator
+func NewCLIOperator() igoperators.DataOperator {
+	return clioperator.CLIOperator
 }

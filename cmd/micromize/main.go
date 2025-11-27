@@ -54,6 +54,7 @@ func main() {
 	defer runtimeManager.Close()
 
 	ociHandlerOp := operators.NewOCIHandler()
+	cliOp := operators.NewCLIOperator()
 
 	localManagerOp, err := operators.NewLocalManager()
 	if err != nil {
@@ -61,32 +62,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	contextManager := gadget.NewContextManager([]operators.DataOperator{ociHandlerOp, localManagerOp})
+	contextManager := gadget.NewContextManager([]operators.DataOperator{ociHandlerOp, localManagerOp, cliOp})
 
 	// Create gadget registry
 	registry := gadget.NewRegistry(contextManager, runtimeManager)
 
+	commonParams := map[string]string{
+		"operator.cli.output": "json",
+	}
+
 	registry.Register("fs-restrict", &gadget.GadgetConfig{
 		Bytes:     fsRestrictGadgetBytes,
 		ImageName: fmt.Sprintf("%s:%s", fsRestrictGadgetImageRepo, Version),
-		Params:    nil,
+		Params:    commonParams,
 	})
 
 	registry.Register("kmod-restrict", &gadget.GadgetConfig{
 		Bytes:     kmodRestrictGadgetBytes,
 		ImageName: fmt.Sprintf("%s:%s", kmodRestrictGadgetImageRepo, Version),
-		Params:    nil,
+		Params:    commonParams,
 	})
 
 	registry.Register("ptrace-restrict", &gadget.GadgetConfig{
 		Bytes:     ptraceRestrictGadgetBytes,
 		ImageName: fmt.Sprintf("%s:%s", ptraceRestrictGadgetImageRepo, Version),
-		Params:    nil,
+		Params:    commonParams,
 	})
 
 	// Run all gadgets
 	if err := registry.RunAll(ctx); err != nil {
-		fmt.Printf("running gadgets: %w", err)
+		fmt.Printf("running gadgets: %v", err)
 		os.Exit(1)
 	}
 
