@@ -42,6 +42,16 @@ int BPF_PROG(micromize_file_open, struct file *file) {
   if (!(file->f_mode & FMODE_WRITE))
     return 0;
 
+  struct task_struct *task = bpf_get_current_task_btf();
+  struct file *exe_file = BPF_CORE_READ(task, mm, exe_file);
+
+  // Allow host processes (like runc) to write to /proc.
+  // We identify them by checking if their executable binary is outside the
+  // container's rootfs. Normal container processes are bound to the container
+  // rootfs.
+  if (exe_file && !is_file_in_container_rootfs(task, exe_file))
+    return 0;
+
   struct inode *inode = BPF_CORE_READ(file, f_inode);
   struct super_block *sb = BPF_CORE_READ(inode, i_sb);
   unsigned long magic = BPF_CORE_READ(sb, s_magic);
