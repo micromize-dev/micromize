@@ -1,17 +1,17 @@
 name: ptrace-restrict
 description: Restrict ptrace
-homepageURL: 'https://github.com/micromize-dev/micromize/tree/main/gadgets/ptrace-restrict'
-documentationURL: 'https://github.com/micromize-dev/micromize/tree/main/gadgets/ptrace-restrict'
-sourceURL: 'https://github.com/micromize-dev/micromize/tree/main/gadgets/ptrace-restrict'
+homepageURL: https://github.com/micromize-dev/micromize/tree/main/gadgets/ptrace-restrict
+documentationURL: https://github.com/micromize-dev/micromize/tree/main/gadgets/ptrace-restrict
+sourceURL: https://github.com/micromize-dev/micromize/tree/main/gadgets/ptrace-restrict
 datasources:
   ptrace_restrict:
     fields:
       process:
         annotations:
-          description: 'The process attempting to use ptrace'
+          description: The process attempting to use ptrace
       timestamp_raw:
         annotations:
-          description: 'Timestamp of the event'
+          description: Timestamp of the event
 params:
   ebpf:
     enforce:
@@ -21,20 +21,20 @@ params:
     targ_comm:
       key: targ_comm
       defaultValue: ""
-      description: 'Process name (comm)'
+      description: Process name (comm)
     targ_gid:
       key: targ_gid
       defaultValue: ""
-      description: 'Group ID'
+      description: Group ID
     targ_pid:
       key: targ_pid
       defaultValue: ""
-      description: 'Process ID'
+      description: Process ID
     targ_tid:
       key: targ_tid
       defaultValue: ""
-      description: 'Thread ID'
+      description: Thread ID
     targ_uid:
       key: targ_uid
       defaultValue: ""
-      description: 'User ID'
+      description: User ID
