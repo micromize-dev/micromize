@@ -92,6 +92,11 @@ func run(ctx context.Context) error {
 	// Create gadget registry
 	registry := gadget.NewRegistry(contextManager, runtimeManager)
 
+	hostPidnsID, err := utils.GetHostPidNamespaceID()
+	if err != nil {
+		return fmt.Errorf("getting host pid namespace ID: %w", err)
+	}
+
 	commonParams := map[string]string{
 		"operator.cli.output":       "json",
 		"operator.oci.ebpf.enforce": fmt.Sprintf("%d", utils.BoolToInt(enforce)),
@@ -103,10 +108,17 @@ func run(ctx context.Context) error {
 		Params:    commonParams,
 	})
 
+	capRestrictParams := map[string]string{
+		"operator.oci.ebpf.host_pidns_id": fmt.Sprintf("%d", hostPidnsID),
+	}
+	for k, v := range commonParams {
+		capRestrictParams[k] = v
+	}
+
 	registry.Register("cap-restrict", &gadget.GadgetConfig{
 		Bytes:     capRestrictGadgetBytes,
 		ImageName: fmt.Sprintf("%s:%s", capRestrictGadgetImageRepo, Version),
-		Params:    commonParams,
+		Params:    capRestrictParams,
 	})
 
 	registry.Register("ptrace-restrict", &gadget.GadgetConfig{

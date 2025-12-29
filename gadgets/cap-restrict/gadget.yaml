@@ -27,6 +27,10 @@ params:
       key: enforce
       defaultValue: "true"
       description: Enforce the restriction (block) or just audit
+    host_pidns_id:
+      key: host_pidns_id
+      defaultValue: "0"
+      description: Host PID Namespace ID
     targ_comm:
       key: targ_comm
       defaultValue: ""

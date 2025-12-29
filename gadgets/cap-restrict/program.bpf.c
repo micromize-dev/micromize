@@ -12,6 +12,9 @@
 const volatile int enforce = 1;
 GADGET_PARAM(enforce);
 
+const volatile __u64 host_pidns_id = 0;
+GADGET_PARAM(host_pidns_id);
+
 GADGET_TRACER_MAP(events, 1024 * 256);
 
 GADGET_TRACER(cap_restrict, events, event);
@@ -21,6 +24,14 @@ static __always_inline int check_unshare_flags(unsigned long flags) {
                            CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID |
                            CLONE_NEWNET;
   return (flags & ns_flags);
+}
+
+static __always_inline __u64 get_current_pidns_id() {
+  struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+  struct pid *pid = BPF_CORE_READ(task, thread_pid);
+  unsigned int level = BPF_CORE_READ(pid, level);
+  struct pid_namespace *ns = BPF_CORE_READ(pid, numbers[level].ns);
+  return BPF_CORE_READ(ns, ns.inum);
 }
 
 SEC("tracepoint/syscalls/sys_enter_clone")
@@ -62,6 +73,10 @@ int micromize_unshare_enter(struct syscall_trace_enter *ctx) {
 SEC("tracepoint/syscalls/sys_enter_setns")
 int micromize_setns_enter(struct syscall_trace_enter *ctx) {
   if (gadget_should_discard_data_current())
+    return 0;
+
+  // allow setns from host pid namespace
+  if (host_pidns_id != 0 && get_current_pidns_id() == host_pidns_id)
     return 0;
 
   u64 pid = bpf_get_current_pid_tgid();
