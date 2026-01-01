@@ -1,0 +1,9 @@
+# Ignore everything by default
+*
+
+# Allow directories and files needed for build
+!gadgets/
+!cmd/
+!internal/
+!go.mod
+!go.sum
