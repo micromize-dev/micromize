@@ -1,6 +1,6 @@
 module github.com/micromize-dev/micromize
 
-go 1.24.6
+go 1.25.5
 
 require (
 	github.com/inspektor-gadget/inspektor-gadget v0.47.0
