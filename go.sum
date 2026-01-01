@@ -194,8 +194,8 @@ github.com/in-toto/in-toto-golang v0.9.0 h1:tHny7ac4KgtsfrG6ybU8gVOZux2H8jN05AXJ
 github.com/in-toto/in-toto-golang v0.9.0/go.mod h1:xsBVrVsHNsB61++S6Dy2vWosKhuA3lUTQd+eF9HdeMo=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
-github.com/inspektor-gadget/inspektor-gadget v0.47.0 h1:VCrc7SAY0vyJsNaNSfTGAPU1Bubcn+Q7vaq4AWRhycQ=
-github.com/inspektor-gadget/inspektor-gadget v0.47.0/go.mod h1:RAtSNVgjZJkAl10AZ8yKfZeo+3xBe641b9su5G6F8Ko=
+github.com/inspektor-gadget/inspektor-gadget v0.46.1-0.20251208111605-1e0005552ccf h1:bpIEH/3MKqutZUFJzTh7KQV9Cz6HATP+wCOcP82dmho=
+github.com/inspektor-gadget/inspektor-gadget v0.46.1-0.20251208111605-1e0005552ccf/go.mod h1:lZG/F69mwaJLKOtOqLDlZ8n/7xQfeCWd270ZSprOK/Y=
 github.com/jackc/chunkreader/v2 v2.0.1 h1:i+RDz65UE+mmpjTfyz0MoVTnzeYxroil2G82ki7MGG8=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/pgconn v1.14.3 h1:bVoTr12EGANZz66nZPkMInAV/KHD2TxH9npjXXgiB3w=

@@ -3,7 +3,7 @@ module github.com/micromize-dev/micromize
 go 1.25.5
 
 require (
-	github.com/inspektor-gadget/inspektor-gadget v0.47.0
+	github.com/inspektor-gadget/inspektor-gadget v0.46.1-0.20251208111605-1e0005552ccf
 	github.com/quay/claircore v1.5.45
 	github.com/spf13/cobra v1.10.1
 	oras.land/oras-go/v2 v2.6.0

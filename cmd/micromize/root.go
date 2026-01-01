@@ -100,6 +100,8 @@ func run(ctx context.Context) error {
 	commonParams := map[string]string{
 		"operator.cli.output":       "json",
 		"operator.oci.ebpf.enforce": fmt.Sprintf("%d", utils.BoolToInt(enforce)),
+		// TOOO: We filter out micromize. At this point, we use the container name for demo purposes until https://github.com/inspektor-gadget/inspektor-gadget/pull/5166 is merged and released.
+		"operator.LocalManager.containername": "!micromize",
 	}
 
 	registry.Register("fs-restrict", &gadget.GadgetConfig{
