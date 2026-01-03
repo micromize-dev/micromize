@@ -2,9 +2,11 @@ FROM ghcr.io/inspektor-gadget/gadget-builder:main AS gadget-builder
 
 ARG IG_VERSION=v0.47.0
 ARG IMAGE_TAG=dev
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install ig
-RUN wget -qO- https://github.com/inspektor-gadget/inspektor-gadget/releases/download/${IG_VERSION}/ig-linux-amd64-${IG_VERSION}.tar.gz \
+RUN wget -qO- https://github.com/inspektor-gadget/inspektor-gadget/releases/download/${IG_VERSION}/ig-${TARGETOS}-${TARGETARCH}-${IG_VERSION}.tar.gz \
     | tar -xz -C /usr/local/bin ig
 
 WORKDIR /app
@@ -23,10 +25,12 @@ RUN mkdir -p build/gadgets && \
             build/gadgets/${gadget}.tar; \
     done
 
-FROM golang:1.25.5-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25.5-alpine AS builder
 
 ARG IG_VERSION=v0.47.0
 ARG IMAGE_TAG=dev
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -43,7 +47,7 @@ RUN mkdir -p cmd/micromize/build
 COPY --from=gadget-builder /app/build/gadgets/*.tar cmd/micromize/build/
 
 # Build the static binary
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
     -tags release \
     -ldflags "-X github.com/inspektor-gadget/inspektor-gadget/internal/version.version=${IG_VERSION} -X main.Version=${IMAGE_TAG} -w -s -extldflags '-static'" \
     -o /micromize \
