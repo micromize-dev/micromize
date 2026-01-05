@@ -36,6 +36,7 @@ docker run -it \
   --privileged \
   -v /sys/fs/bpf:/sys/fs/bpf \
   -v /sys/kernel/debug:/sys/kernel/debug \
+  -v /sys/kernel/security:/sys/kernel/security:ro \
   -v /bin:/host/bin \
   -v /proc:/host/proc \
   -v /run:/host/run \

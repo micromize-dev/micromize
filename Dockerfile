@@ -60,6 +60,9 @@ COPY --from=builder /micromize /micromize
 # Access to kernel debug filesystem (tracefs)
 VOLUME ["/sys/kernel/debug"]
 
+# Access to kernel security configuration (LSM)
+VOLUME ["/sys/kernel/security"]
+
 # Access to BPF filesystem for map pinning
 VOLUME ["/sys/fs/bpf"]
 

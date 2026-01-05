@@ -54,6 +54,13 @@ func init() {
 
 func run(ctx context.Context) error {
 	slog.Info("Starting micromize...")
+	
+	// Validate BPF LSM is enabled before starting
+	if err := utils.ValidateBPFLSM(); err != nil {
+		return fmt.Errorf("BPF LSM validation failed: %w", err)
+	}
+	slog.Info("BPF LSM is enabled")
+	
 	if enforce {
 		slog.Info("Enforcement enabled")
 	} else {

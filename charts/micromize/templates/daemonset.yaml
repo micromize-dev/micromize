@@ -65,6 +65,10 @@ spec:
             # Required for accessing debugfs (e.g. for kprobes).
             - mountPath: /sys/kernel/debug
               name: debugfs
+            # Required for validating BPF LSM is enabled.
+            - mountPath: /sys/kernel/security
+              name: security
+              readOnly: true
             # Required for container level enrichment.
             - mountPath: /host/bin
               name: host-bin
@@ -86,6 +90,9 @@ spec:
         - name: debugfs
           hostPath:
             path: /sys/kernel/debug
+        - name: security
+          hostPath:
+            path: /sys/kernel/security
         - name: host-bin
           hostPath:
             path: /bin
