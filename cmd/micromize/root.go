@@ -48,19 +48,20 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Version = Version
 	rootCmd.PersistentFlags().BoolVar(&enforce, "enforce", true, "Enforce restrictions")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 }
 
 func run(ctx context.Context) error {
 	slog.Info("Starting micromize...")
-	
+
 	// Validate BPF LSM is enabled before starting
 	if err := utils.ValidateBPFLSM(); err != nil {
 		return fmt.Errorf("BPF LSM validation failed: %w", err)
 	}
 	slog.Info("BPF LSM is enabled")
-	
+
 	if enforce {
 		slog.Info("Enforcement enabled")
 	} else {
