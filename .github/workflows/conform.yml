@@ -16,6 +16,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Conform
-        uses: siderolabs/conform@v0.1.0-alpha.30
+        uses: siderolabs/conform@v0.1.0-alpha.31
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
