@@ -7,18 +7,19 @@ import (
 	igoperators "github.com/inspektor-gadget/inspektor-gadget/pkg/operators"
 	clioperator "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/cli"
 	_ "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/ebpf"
-	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators/localmanager"
 	ocihandler "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/oci-handler"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
+
+	"github.com/micromize-dev/micromize/internal/localmanager"
 )
 
 // DataOperator is an alias for igoperators.DataOperator to avoid direct dependency in main
 type DataOperator = igoperators.DataOperator
 
-func NewLocalManager() (igoperators.DataOperator, error) {
+func NewLocalManager(extraOpts ...localmanager.ContainerCollectionOption) (*localmanager.LocalManager, error) {
 	slog.Debug("Initializing local manager operator")
 	host.Init(host.Config{})
-	localManagerOp := localmanager.LocalManagerOperator
+	localManagerOp := localmanager.New(extraOpts...)
 	localManagerParams := localManagerOp.GlobalParamDescs().ToParams()
 
 	if err := localManagerOp.Init(localManagerParams); err != nil {

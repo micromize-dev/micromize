@@ -94,6 +94,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("creating local manager operator: %w", err)
 	}
+	defer localManagerOp.Close()
 
 	contextManager := gadget.NewContextManager([]operators.DataOperator{ociHandlerOp, localManagerOp, cliOp})
 
