@@ -69,7 +69,7 @@ func TestValidateBPFLSM(t *testing.T) {
 			tmpDir := t.TempDir()
 			tmpFile := filepath.Join(tmpDir, "lsm")
 
-			if err := os.WriteFile(tmpFile, []byte(tt.lsmContent), 0644); err != nil {
+			if err := os.WriteFile(tmpFile, []byte(tt.lsmContent), 0600); err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
 

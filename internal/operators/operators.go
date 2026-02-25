@@ -43,7 +43,9 @@ type DataOperator = igoperators.DataOperator
 
 func NewLocalManager() (igoperators.DataOperator, error) {
 	slog.Debug("Initializing local manager operator")
-	host.Init(host.Config{})
+	if err := host.Init(host.Config{}); err != nil {
+		return nil, fmt.Errorf("init host: %w", err)
+	}
 	localManagerOp := localmanager.LocalManagerOperator
 	localManagerParams := localManagerOp.GlobalParamDescs().ToParams()
 
@@ -244,7 +246,9 @@ func populateExpectedHashes(gadgetCtx igoperators.GadgetContext, innerMaps *sync
 	// Insert the inner map into the outer map keyed by mntns_id
 	if err := outerMap.Put(mntnsID, uint32(innerMap.FD())); err != nil {
 		slog.Error("Failed to insert inner map into expected_hashes", "mntns_id", mntnsID, "error", err)
-		innerMap.Close()
+		if err := innerMap.Close(); err != nil {
+			slog.Error("Failed to close inner BPF map", "mntns_id", mntnsID, "error", err)
+		}
 		return
 	}
 
@@ -281,7 +285,9 @@ func handleContainerRemoved(gadgetCtx igoperators.GadgetContext, innerMaps *sync
 
 	if val, loaded := innerMaps.LoadAndDelete(mntnsID); loaded {
 		if m, ok := val.(*ebpf.Map); ok && m != nil {
-			m.Close()
+			if err := m.Close(); err != nil {
+				slog.Debug("Failed to close inner BPF map on container removal", "mntns_id", mntnsID, "error", err)
+			}
 		}
 	}
 

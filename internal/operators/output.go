@@ -237,7 +237,9 @@ func formatAndPrintEvent(f *eventFields, data datasource.Data) {
 	}
 
 	outputMu.Lock()
-	fmt.Fprintln(os.Stdout, sb.String())
+	if _, err := fmt.Fprintln(os.Stdout, sb.String()); err != nil {
+		slog.Error("Failed to write event output", "error", err)
+	}
 	outputMu.Unlock()
 }
 

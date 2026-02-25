@@ -1,0 +1,58 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - errorlint
+    - govet
+    - ineffassign
+    - gosec
+    - staticcheck
+    - unused
+  settings:
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    staticcheck:
+      checks:
+        - all
+    gosec:
+      excludes:
+        # Integer overflow conversion is acceptable in BPF context (e.g. mntns_id, pid).
+        - G115
+  exclusions:
+    generated: lax
+    rules:
+      # Ignore check: Packages must have a package comment
+      - linters:
+          - staticcheck
+        text: "ST1000: at least one file in a package should have a package comment"
+      # Ignore rule about ID vs Id: https://github.com/golang/lint/issues/89
+      - linters:
+          - staticcheck
+        text: "ST1003:"
+    paths:
+      # Exclude generated build directory
+      - ^build/
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/micromize-dev/micromize
+  exclusions:
+    generated: lax
+    paths:
+      - ^build/
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

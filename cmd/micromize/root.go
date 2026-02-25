@@ -24,12 +24,13 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/spf13/cobra"
+
 	"github.com/micromize-dev/micromize/internal/gadget"
 	"github.com/micromize-dev/micromize/internal/logger"
 	"github.com/micromize-dev/micromize/internal/operators"
 	"github.com/micromize-dev/micromize/internal/runtime"
 	"github.com/micromize-dev/micromize/internal/utils"
-	"github.com/spf13/cobra"
 )
 
 const (

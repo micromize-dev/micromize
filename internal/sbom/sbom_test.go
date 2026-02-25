@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-jose/go-jose/v4/testutils/require"
 )
 
 func TestNormalizeImageRef(t *testing.T) {
@@ -99,14 +101,17 @@ func TestImageRefFromDockerConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	containerID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 	containerDir := filepath.Join(tmpDir, "containers", containerID)
-	if err := os.MkdirAll(containerDir, 0o755); err != nil {
+	if err := os.MkdirAll(containerDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
 	writeConfig := func(image string) {
 		cfg := map[string]any{"Config": map[string]string{"Image": image}}
-		data, _ := json.Marshal(cfg)
-		os.WriteFile(filepath.Join(containerDir, "config.v2.json"), data, 0o644)
+		data, err := json.Marshal(cfg)
+		require.NoError(t, err)
+		if err := os.WriteFile(filepath.Join(containerDir, "config.v2.json"), data, 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Temporarily override dockerDataRoots to use our tmpDir.

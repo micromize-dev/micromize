@@ -49,5 +49,7 @@ func (m *Manager) RunGadget(gadgetCtx *gadgetcontext.GadgetContext, params map[s
 // Close cleans up runtime resources
 func (m *Manager) Close() {
 	slog.Debug("Closing runtime manager")
-	m.runtime.Close()
+	if err := m.runtime.Close(); err != nil {
+		slog.Error("Error closing runtime", "error", err)
+	}
 }

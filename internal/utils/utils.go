@@ -59,7 +59,7 @@ func GetHostPidNamespaceID() (uint64, error) {
 func ValidateBPFLSM() error {
 	data, err := os.ReadFile(lsmFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to read %s: %w\nBPF LSM support cannot be verified. Ensure the kernel has LSM support enabled.", lsmFilePath, err)
+		return fmt.Errorf("failed to read %s: Unable to verify whether BPF LSM is enabled: %w", lsmFilePath, err)
 	}
 
 	lsmList := strings.TrimSpace(string(data))

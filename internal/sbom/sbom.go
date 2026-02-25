@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	dockerconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/configfile"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -135,8 +136,11 @@ func ImageRefFromDockerConfig(containerID string) string {
 	}
 
 	for _, root := range dockerDataRootsFn() {
-		cfgPath := filepath.Join(root, "containers", containerID, "config.v2.json")
-		data, err := os.ReadFile(cfgPath)
+		cfgPath, err := securejoin.SecureJoin(root, filepath.Join("containers", containerID, "config.v2.json"))
+		if err != nil {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Clean(cfgPath))
 		if err != nil {
 			continue
 		}
@@ -335,7 +339,11 @@ func fetchCosignAttestation(ctx context.Context, repo *remote.Repository, imageD
 	if err != nil {
 		return nil, fmt.Errorf("fetching cosign attestation manifest: %w", err)
 	}
-	defer rc.Close()
+	defer func() {
+		if err := rc.Close(); err != nil {
+			slog.Debug("Failed to close cosign attestation manifest reader", "error", err)
+		}
+	}()
 
 	manifestBytes, err := io.ReadAll(rc)
 	if err != nil {
@@ -368,7 +376,11 @@ func fetchDSSEEnvelope(ctx context.Context, repo *remote.Repository, layer ocisp
 	if err != nil {
 		return nil, fmt.Errorf("fetching DSSE envelope: %w", err)
 	}
-	defer layerRC.Close()
+	defer func() {
+		if err := layerRC.Close(); err != nil {
+			slog.Debug("Failed to close DSSE envelope reader", "error", err)
+		}
+	}()
 
 	envelopeBytes, err := io.ReadAll(layerRC)
 	if err != nil {
@@ -459,10 +471,14 @@ func loadDockerConfig() (*configfile.ConfigFile, error) {
 		return cfg, nil
 	}
 
-	sudoHome := filepath.Join("/home", sudoUser)
-	sudoCfg, err := dockerconfig.Load(filepath.Join(sudoHome, ".docker"))
+	sudoHome, err := securejoin.SecureJoin("/home", sudoUser)
 	if err != nil {
-		slog.Debug("Could not load Docker config for SUDO_USER", "user", sudoUser, "error", err)
+		slog.Debug("Could not resolve home directory for SUDO_USER", "error", err)
+		return cfg, nil
+	}
+	sudoCfg, err := dockerconfig.Load(filepath.Clean(filepath.Join(sudoHome, ".docker")))
+	if err != nil {
+		slog.Debug("Could not load Docker config for SUDO_USER")
 		return cfg, nil
 	}
 

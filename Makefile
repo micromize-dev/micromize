@@ -10,6 +10,9 @@ LDFLAGS := -X github.com/inspektor-gadget/inspektor-gadget/internal/version.vers
 GADGETS := fs-restrict cap-restrict ptrace-restrict binary-attestation
 CONFORM_VERSION ?= v0.1.0-alpha.30
 
+# This version number must be kept in sync with CI workflow lint one.
+LINTER_IMAGE ?= golangci/golangci-lint:v2.10.1
+
 .PHONY: setup-hooks
 setup-hooks:
 	go install github.com/siderolabs/conform/cmd/conform@$(CONFORM_VERSION)
@@ -25,6 +28,22 @@ license-check:
 license-add:
 	@go run github.com/google/addlicense@v1.2.0 -y "" -l apache -c "The micromize authors" \
 		$$(find . -name '*.go' -not -path './build/*')
+
+.PHONY: lint
+lint:
+	docker build -t linter -f Dockerfiles/linter.Dockerfile --build-arg IMAGE=$(LINTER_IMAGE) Dockerfiles
+	# XDG_CACHE_HOME is necessary to avoid this type of errors:
+	# ERRO Running error: context loading failed: failed to load packages: failed to load with go/packages: err: exit status 1: stderr: failed to initialize build cache at /.cache/go-build: mkdir /.cache: permission denied
+	# Process 15167 has exited with status 3
+	# While GOLANGCI_LINT_CACHE is used to store golangci-lint cache.
+	docker run --rm --env XDG_CACHE_HOME=/tmp/xdg_home_cache \
+		--env GOLANGCI_LINT_CACHE=/tmp/golangci_lint_cache \
+		--user $(shell id -u):$(shell id -g) -v $(shell pwd):/app -w /app \
+		linter
+
+.PHONY: clean
+clean:
+	rm -rf $(OUTPUT_DIR) build/src build/gadgets
 
 .PHONY: build-all
 build-all: $(GADGETS) build-app
