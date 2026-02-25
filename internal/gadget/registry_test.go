@@ -16,9 +16,9 @@ package gadget
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
-	"time"
 
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
 )
@@ -80,14 +80,87 @@ func TestRegistry_RunAll(t *testing.T) {
 		Params:    map[string]string{"foo": "bar"},
 	})
 
-	if err := r.RunAll(context.Background()); err != nil {
+	g, err := r.RunAll(context.Background())
+	if err != nil {
 		t.Fatalf("RunAll failed: %v", err)
+	}
+
+	if err := g.Wait(); err != nil {
+		t.Fatalf("Wait returned error: %v", err)
 	}
 
 	select {
 	case <-done:
 		// success
-	case <-time.After(2 * time.Millisecond):
-		t.Fatal("timeout waiting for RunGadget")
+	default:
+		t.Fatal("RunGadget was never called")
+	}
+}
+
+func TestRegistry_RunAll_ErrorPropagation(t *testing.T) {
+	mockRuntime := &mockRuntimeManager{
+		runGadgetFunc: func(gadgetCtx *gadgetcontext.GadgetContext, params map[string]string) error {
+			return fmt.Errorf("gadget startup failed")
+		},
+	}
+
+	mockContext := &mockContextCreator{}
+	r := NewRegistry(mockContext, mockRuntime)
+
+	r.Register("failing-gadget", &GadgetConfig{
+		ImageName: "test-image",
+		Params:    map[string]string{},
+	})
+
+	g, err := r.RunAll(context.Background())
+	if err != nil {
+		t.Fatalf("RunAll failed: %v", err)
+	}
+
+	err = g.Wait()
+	if err == nil {
+		t.Fatal("expected error from Wait, got nil")
+	}
+
+	expected := "running gadget failing-gadget: gadget startup failed"
+	if err.Error() != expected {
+		t.Errorf("expected error %q, got %q", expected, err.Error())
+	}
+}
+
+func TestRegistry_RunAll_ContextCancellation(t *testing.T) {
+	mockRuntime := &mockRuntimeManager{
+		runGadgetFunc: func(gadgetCtx *gadgetcontext.GadgetContext, params map[string]string) error {
+			// Simulate a long-running gadget that respects context cancellation
+			<-gadgetCtx.Context().Done()
+			return gadgetCtx.Context().Err()
+		},
+	}
+
+	mockContext := &mockContextCreator{}
+	r := NewRegistry(mockContext, mockRuntime)
+
+	r.Register("long-running", &GadgetConfig{
+		ImageName: "test-image",
+		Params:    map[string]string{},
+	})
+
+	r.Register("another", &GadgetConfig{
+		ImageName: "test-image",
+		Params:    map[string]string{},
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, err := r.RunAll(ctx)
+	if err != nil {
+		t.Fatalf("RunAll failed: %v", err)
+	}
+
+	// Cancel the context to simulate shutdown signal
+	cancel()
+
+	err = g.Wait()
+	if err == nil {
+		t.Fatal("expected error from Wait after cancellation, got nil")
 	}
 }

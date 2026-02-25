@@ -17,9 +17,9 @@ package gadget
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
+	"golang.org/x/sync/errgroup"
 )
 
 // RuntimeManager defines the interface for running gadgets
@@ -61,24 +61,43 @@ func (r *Registry) Register(name string, config *GadgetConfig) {
 	r.gadgets[name] = config
 }
 
-// RunAll starts all registered gadgets
-func (r *Registry) RunAll(ctx context.Context) error {
+// RunAll starts all registered gadgets and returns an errgroup that the caller
+// can Wait() on. If any gadget fails, the errgroup's context is canceled,
+// signaling other gadgets to stop.
+func (r *Registry) RunAll(ctx context.Context) (*errgroup.Group, error) {
+	g, gCtx := errgroup.WithContext(ctx)
+
+	// Pre-pass: create all gadget contexts before starting any goroutines.
+	// This ensures that if CreateContext fails, no goroutines have been started.
+	type gadgetEntry struct {
+		name      string
+		config    *GadgetConfig
+		gadgetCtx *gadgetcontext.GadgetContext
+	}
+
+	entries := make([]gadgetEntry, 0, len(r.gadgets))
 	for name, config := range r.gadgets {
 		contextManager := r.defaultContextManager
 		if config.Context != nil {
 			contextManager = config.Context
 		}
 
-		gadgetCtx, err := contextManager.CreateContext(ctx, config.Bytes, config.ImageName)
+		gadgetCtx, err := contextManager.CreateContext(gCtx, config.Bytes, config.ImageName)
 		if err != nil {
-			return fmt.Errorf("creating context for gadget %s: %w", name, err)
+			return nil, fmt.Errorf("creating context for gadget %s: %w", name, err)
 		}
 
-		go func(name string, config *GadgetConfig, gadgetCtx *gadgetcontext.GadgetContext) {
-			if err := r.runtimeManager.RunGadget(gadgetCtx, config.Params); err != nil {
-				slog.Error("Error running gadget", "name", name, "error", err)
-			}
-		}(name, config, gadgetCtx)
+		entries = append(entries, gadgetEntry{name: name, config: config, gadgetCtx: gadgetCtx})
 	}
-	return nil
+
+	for _, e := range entries {
+		g.Go(func() error {
+			if err := r.runtimeManager.RunGadget(e.gadgetCtx, e.config.Params); err != nil {
+				return fmt.Errorf("running gadget %s: %w", e.name, err)
+			}
+			return nil
+		})
+	}
+
+	return g, nil
 }
