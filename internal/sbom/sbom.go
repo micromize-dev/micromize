@@ -30,6 +30,7 @@ import (
 
 	dockerconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/golang/groupcache/lru"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/singleflight"
 	"oras.land/oras-go/v2/errdef"
@@ -43,53 +44,100 @@ var imageAnnotationKeys = []string{
 	"io.containerd.image.name",
 }
 
-type result struct {
+const defaultMaxCacheEntries = 128
+
+type cacheEntry struct {
+	Files   []FileInfo
 	HasSBOM bool
-	SBOM    []byte
 }
 
 type Fetcher struct {
-	cache sync.Map
+	mu    sync.Mutex
+	cache *lru.Cache // keyed by digest string, value is *cacheEntry
 	group singleflight.Group
 }
 
 func NewFetcher() *Fetcher {
-	return &Fetcher{}
+	return &Fetcher{
+		cache: lru.New(defaultMaxCacheEntries),
+	}
 }
 
-// FetchForImage fetches the SPDX SBOM for the given image reference.
-// Repeated calls for the same image are served from cache.
-func (f *Fetcher) FetchForImage(ctx context.Context, imageRef string) ([]byte, error) {
+// ResolveDigest resolves an image reference to its digest via a lightweight
+// registry HEAD request. Returns a digest string like "sha256:abc123...".
+func ResolveDigest(ctx context.Context, imageRef string) (string, error) {
+	repo, err := newAuthenticatedRepo(imageRef)
+	if err != nil {
+		return "", fmt.Errorf("creating repository client: %w", err)
+	}
+
+	desc, err := repo.Resolve(ctx, repo.Reference.Reference)
+	if err != nil {
+		return "", fmt.Errorf("resolving image %s: %w", imageRef, err)
+	}
+
+	return desc.Digest.String(), nil
+}
+
+// FetchForImage fetches and parses the SPDX SBOM for the given image reference.
+// Results are cached by image digest using an LRU cache.
+func (f *Fetcher) FetchForImage(ctx context.Context, imageRef string) ([]FileInfo, error) {
 	if imageRef == "" {
 		return nil, nil
 	}
 
-	if cached, ok := f.cache.Load(imageRef); ok {
-		r := cached.(*result)
-		if !r.HasSBOM {
-			slog.Debug("Image previously checked, no SBOM available", "image", imageRef)
-			return nil, nil
-		}
-		slog.Debug("Returning cached SBOM", "image", imageRef)
-		return r.SBOM, nil
+	digest, err := ResolveDigest(ctx, imageRef)
+	if err != nil {
+		return nil, err
 	}
 
-	v, err, _ := f.group.Do(imageRef, func() (any, error) {
-		sbomBytes, err := fetchSPDXSBOM(ctx, imageRef)
+	return f.FetchForDigest(ctx, imageRef, digest)
+}
+
+// FetchForDigest fetches and parses the SPDX SBOM using a pre-resolved digest.
+// Use this when the digest has already been resolved to avoid a redundant HEAD request.
+func (f *Fetcher) FetchForDigest(ctx context.Context, imageRef string, digest string) ([]FileInfo, error) {
+	if imageRef == "" {
+		return nil, nil
+	}
+
+	f.mu.Lock()
+	if cached, ok := f.cache.Get(digest); ok {
+		entry := cached.(*cacheEntry)
+		f.mu.Unlock()
+		if !entry.HasSBOM {
+			slog.Debug("Image previously checked, no SBOM available", "image", imageRef, "digest", digest)
+			return nil, nil
+		}
+		slog.Debug("Returning cached SBOM", "image", imageRef, "digest", digest)
+		return entry.Files, nil
+	}
+	f.mu.Unlock()
+
+	v, err, _ := f.group.Do(digest, func() (any, error) {
+		sbomBytes, err := fetchSBOMByDigest(ctx, imageRef, digest)
 		if err != nil {
-			// Don't cache errors — they may be transient (auth, network).
 			return nil, fmt.Errorf("fetching SBOM for image %s: %w", imageRef, err)
 		}
 
 		if sbomBytes == nil {
-			slog.Debug("No SPDX SBOM attached to image", "image", imageRef)
-			f.cache.Store(imageRef, &result{HasSBOM: false})
+			slog.Debug("No SPDX SBOM attached to image", "image", imageRef, "digest", digest)
+			f.mu.Lock()
+			f.cache.Add(digest, &cacheEntry{HasSBOM: false})
+			f.mu.Unlock()
 			return nil, nil
 		}
 
-		slog.Debug("Fetched SPDX SBOM for image", "image", imageRef, "size", len(sbomBytes))
-		f.cache.Store(imageRef, &result{HasSBOM: true, SBOM: sbomBytes})
-		return sbomBytes, nil
+		files, err := ParseFiles(sbomBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parsing SBOM for image %s: %w", imageRef, err)
+		}
+
+		slog.Debug("Fetched and parsed SPDX SBOM for image", "image", imageRef, "digest", digest, "files", len(files))
+		f.mu.Lock()
+		f.cache.Add(digest, &cacheEntry{HasSBOM: true, Files: files})
+		f.mu.Unlock()
+		return files, nil
 	})
 	if err != nil {
 		return nil, err
@@ -97,7 +145,7 @@ func (f *Fetcher) FetchForImage(ctx context.Context, imageRef string) ([]byte, e
 	if v == nil {
 		return nil, nil
 	}
-	return v.([]byte), nil
+	return v.([]FileInfo), nil
 }
 
 // ImageRefFromOCIConfig parses the OCI runtime spec config JSON and extracts
@@ -291,15 +339,18 @@ func isUnderBinOrLib(name string) bool {
 	return false
 }
 
-func fetchSPDXSBOM(ctx context.Context, imageRef string) ([]byte, error) {
+// fetchSBOMByDigest fetches the SPDX SBOM for an image using its digest
+// to locate the cosign attestation tag.
+func fetchSBOMByDigest(ctx context.Context, imageRef string, digest string) ([]byte, error) {
 	repo, err := newAuthenticatedRepo(imageRef)
 	if err != nil {
 		return nil, fmt.Errorf("creating repository client: %w", err)
 	}
 
-	desc, err := repo.Resolve(ctx, repo.Reference.Reference)
+	// Resolve by digest to get the full descriptor for cosign attestation lookup.
+	desc, err := repo.Resolve(ctx, digest)
 	if err != nil {
-		return nil, fmt.Errorf("resolving image %s: %w", imageRef, err)
+		return nil, fmt.Errorf("resolving image %s by digest: %w", imageRef, err)
 	}
 
 	return fetchCosignAttestation(ctx, repo, desc)

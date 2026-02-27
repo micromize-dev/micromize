@@ -85,12 +85,12 @@ func TestImageRefFromOCIConfig(t *testing.T) {
 
 func TestFetchForImage_EmptyRef(t *testing.T) {
 	f := NewFetcher()
-	data, err := f.FetchForImage(t.Context(), "")
+	files, err := f.FetchForImage(t.Context(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if data != nil {
-		t.Errorf("expected nil for empty ref, got %d bytes", len(data))
+	if files != nil {
+		t.Errorf("expected nil for empty ref, got %d files", len(files))
 	}
 }
 
@@ -286,5 +286,27 @@ func TestParseFiles_RejectsRelativePaths(t *testing.T) {
 				t.Errorf("ParseFiles included=%v, want included=%v for fileName=%q", found, tt.wantIncl, tt.fileName)
 			}
 		})
+	}
+}
+
+func TestLRUCacheBounded(t *testing.T) {
+	f := NewFetcher()
+
+	// The cache should accept entries and evict old ones.
+	// We test the internal cache directly since FetchForImage requires
+	// network access.
+	for i := 0; i < defaultMaxCacheEntries+10; i++ {
+		digest := "sha256:" + "a" + string(rune('0'+i%10)) + "b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85" + string(rune('0'+i/10))
+		f.mu.Lock()
+		f.cache.Add(digest, &cacheEntry{HasSBOM: false})
+		f.mu.Unlock()
+	}
+
+	f.mu.Lock()
+	cacheLen := f.cache.Len()
+	f.mu.Unlock()
+
+	if cacheLen > defaultMaxCacheEntries {
+		t.Errorf("cache size %d exceeds max %d", cacheLen, defaultMaxCacheEntries)
 	}
 }
