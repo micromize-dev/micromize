@@ -70,7 +70,7 @@ func NewImaOperator() igoperators.DataOperator {
 	slog.Debug("Creating IMA operator")
 	opPriority := math.MaxInt
 	sbomFetcher := sbom.NewFetcher()
-	innerMaps := &sync.Map{} // mntns_id -> *ebpf.Map (for cleanup)
+	digestState := newDigestState()
 
 	operatorOptions := []simple.Option{
 		simple.WithPriority(opPriority),
@@ -103,9 +103,9 @@ func NewImaOperator() igoperators.DataOperator {
 				}
 				switch eventType {
 				case "CREATED":
-					handleContainerCreated(ctx, gadgetCtx, sbomFetcher, innerMaps, containerConfigField, containerIDField, mntnsIDField, data)
-				case "REMOVED":
-					handleContainerRemoved(gadgetCtx, innerMaps, mntnsIDField, data)
+					handleContainerCreated(ctx, gadgetCtx, sbomFetcher, digestState, containerConfigField, containerIDField, mntnsIDField, data)
+				case "DELETED":
+					handleContainerRemoved(gadgetCtx, digestState, mntnsIDField, data)
 				}
 				return nil
 			}, opPriority); err != nil {
@@ -117,7 +117,28 @@ func NewImaOperator() igoperators.DataOperator {
 	return simple.New("imaOperator", operatorOptions...)
 }
 
-func handleContainerCreated(ctx context.Context, gadgetCtx igoperators.GadgetContext, fetcher *sbom.Fetcher, innerMaps *sync.Map, configField datasource.FieldAccessor, containerIDField datasource.FieldAccessor, mntnsIDField datasource.FieldAccessor, data datasource.Data) {
+// digestMapEntry tracks a shared inner BPF map for a given image digest.
+type digestMapEntry struct {
+	innerMap *ebpf.Map
+	refCount int
+}
+
+// digestTracker manages the mapping between containers (mntns_id) and their
+// image digests, with reference counting for shared inner BPF maps.
+type digestTracker struct {
+	mu               sync.Mutex
+	digestEntries    map[string]*digestMapEntry // digest string → entry
+	containerDigests map[uint64]string          // mntns_id → digest string
+}
+
+func newDigestState() *digestTracker {
+	return &digestTracker{
+		digestEntries:    make(map[string]*digestMapEntry),
+		containerDigests: make(map[uint64]string),
+	}
+}
+
+func handleContainerCreated(ctx context.Context, gadgetCtx igoperators.GadgetContext, fetcher *sbom.Fetcher, dt *digestTracker, configField datasource.FieldAccessor, containerIDField datasource.FieldAccessor, mntnsIDField datasource.FieldAccessor, data datasource.Data) {
 	ociConfig, err := configField.String(data)
 	if err != nil {
 		slog.Debug("Failed to read container_config field", "error", err)
@@ -139,29 +160,74 @@ func handleContainerCreated(ctx context.Context, gadgetCtx igoperators.GadgetCon
 
 	imageRef = sbom.NormalizeImageRef(imageRef)
 
+	if mntnsIDField == nil {
+		slog.Debug("mntns_id field not available, cannot populate BPF maps")
+		return
+	}
+
+	mntnsID, err := mntnsIDField.Uint64(data)
+	if err != nil {
+		slog.Error("Failed to read mntns_id field", "error", err)
+		return
+	}
+
+	// Resolve image digest (lightweight HEAD request).
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	sbomData, err := fetcher.FetchForImage(fetchCtx, imageRef)
+	digest, err := sbom.ResolveDigest(fetchCtx, imageRef)
+	if err != nil {
+		slog.Error("Failed to resolve image digest", "image", imageRef, "error", err)
+		return
+	}
+
+	// Check if we already have an inner map for this digest (another
+	// container with the same image is already running).
+	dt.mu.Lock()
+	if entry, ok := dt.digestEntries[digest]; ok {
+		entry.refCount++
+		dt.containerDigests[mntnsID] = digest
+		innerMap := entry.innerMap
+		dt.mu.Unlock()
+
+		// Reuse the same inner map FD in expected_hashes for this mntns_id.
+		insertSharedInnerMap(gadgetCtx, mntnsID, innerMap)
+		slog.Debug("Reusing existing inner map", "image", imageRef, "digest", digest, "mntns_id", mntnsID, "refCount", entry.refCount)
+		return
+	}
+	dt.mu.Unlock()
+
+	// First container with this digest — fetch and parse the SBOM.
+	// Use FetchForDigest to avoid a redundant HEAD request.
+	files, err := fetcher.FetchForDigest(fetchCtx, imageRef, digest)
 	if err != nil {
 		slog.Error("Failed to fetch SBOM", "error", err)
 		return
 	}
-	if sbomData != nil {
-		slog.Debug("SBOM fetched for container image", "image", imageRef, "size", len(sbomData))
 
-		files, err := sbom.ParseFiles(sbomData)
-		if err != nil {
-			slog.Error("Failed to parse SBOM files", "error", err)
-			return
-		}
+	if len(files) > 0 {
+		slog.Debug("SBOM fetched for container image", "image", imageRef, "digest", digest, "files", len(files))
 		for _, f := range files {
 			slog.Debug("SBOM binary file", "image", imageRef, "file", f.FileName, "sha256", f.SHA256)
 		}
 
-		if mntnsIDField != nil && len(files) > 0 {
-			populateExpectedHashes(gadgetCtx, innerMaps, mntnsIDField, data, files)
+		// Re-check under lock: another goroutine may have created the
+		// entry while we were fetching.
+		dt.mu.Lock()
+		if entry, ok := dt.digestEntries[digest]; ok {
+			entry.refCount++
+			dt.containerDigests[mntnsID] = digest
+			innerMap := entry.innerMap
+			dt.mu.Unlock()
+
+			insertSharedInnerMap(gadgetCtx, mntnsID, innerMap)
+			slog.Debug("Reusing inner map (created during fetch)", "image", imageRef, "digest", digest, "mntns_id", mntnsID, "refCount", entry.refCount)
+			return
 		}
+		// Hold the lock through populateExpectedHashes to prevent
+		// two goroutines from both creating inner maps for the same digest.
+		populateExpectedHashes(gadgetCtx, dt, mntnsID, digest, files)
+		dt.mu.Unlock()
 	}
 }
 
@@ -173,7 +239,7 @@ const (
 	maxFilepathLen        = 64
 )
 
-func populateExpectedHashes(gadgetCtx igoperators.GadgetContext, innerMaps *sync.Map, mntnsIDField datasource.FieldAccessor, data datasource.Data, files []sbom.FileInfo) {
+func populateExpectedHashes(gadgetCtx igoperators.GadgetContext, dt *digestTracker, mntnsID uint64, digest string, files []sbom.FileInfo) {
 	outerMapVar, ok := gadgetCtx.GetVar(expectedHashesMapName)
 	if !ok {
 		slog.Debug("expected_hashes map not available in gadget context, skipping map population")
@@ -186,13 +252,7 @@ func populateExpectedHashes(gadgetCtx igoperators.GadgetContext, innerMaps *sync
 		return
 	}
 
-	mntnsID, err := mntnsIDField.Uint64(data)
-	if err != nil {
-		slog.Error("Failed to read mntns_id field", "error", err)
-		return
-	}
-
-	// Create a new inner map for this mount namespace
+	// Create a new inner map for this digest
 	innerMapSpec := &ebpf.MapSpec{
 		Type:       ebpf.Hash,
 		KeySize:    uint32(maxFilepathLen),
@@ -241,20 +301,41 @@ func populateExpectedHashes(gadgetCtx igoperators.GadgetContext, innerMaps *sync
 		}
 	}
 
-	// Insert the inner map into the outer map keyed by mntns_id
+	// Insert the inner map into expected_hashes keyed by mntns_id
 	if err := outerMap.Put(mntnsID, uint32(innerMap.FD())); err != nil {
 		slog.Error("Failed to insert inner map into expected_hashes", "mntns_id", mntnsID, "error", err)
 		innerMap.Close()
 		return
 	}
 
-	// Track the inner map for cleanup on container removal
-	innerMaps.Store(mntnsID, innerMap)
+	// Track the inner map by digest for sharing with future containers.
+	// Caller holds dt.mu.
+	dt.digestEntries[digest] = &digestMapEntry{innerMap: innerMap, refCount: 1}
+	dt.containerDigests[mntnsID] = digest
 
-	slog.Debug("Populated expected_hashes map", "mntns_id", mntnsID, "entries", len(files))
+	slog.Debug("Populated expected_hashes map", "digest", digest, "mntns_id", mntnsID, "entries", len(files))
 }
 
-func handleContainerRemoved(gadgetCtx igoperators.GadgetContext, innerMaps *sync.Map, mntnsIDField datasource.FieldAccessor, data datasource.Data) {
+// insertSharedInnerMap inserts an existing inner map into expected_hashes
+// for a new container that shares the same image digest.
+func insertSharedInnerMap(gadgetCtx igoperators.GadgetContext, mntnsID uint64, innerMap *ebpf.Map) {
+	outerMapVar, ok := gadgetCtx.GetVar(expectedHashesMapName)
+	if !ok {
+		slog.Debug("expected_hashes map not available in gadget context")
+		return
+	}
+	outerMap, ok := outerMapVar.(*ebpf.Map)
+	if !ok || outerMap == nil {
+		slog.Debug("expected_hashes map is not a valid *ebpf.Map")
+		return
+	}
+
+	if err := outerMap.Put(mntnsID, uint32(innerMap.FD())); err != nil {
+		slog.Error("Failed to insert shared inner map into expected_hashes", "mntns_id", mntnsID, "error", err)
+	}
+}
+
+func handleContainerRemoved(gadgetCtx igoperators.GadgetContext, dt *digestTracker, mntnsIDField datasource.FieldAccessor, data datasource.Data) {
 	if mntnsIDField == nil {
 		slog.Debug("mntns_id field not available, cannot clean up expected_hashes for removed container")
 		return
@@ -266,6 +347,7 @@ func handleContainerRemoved(gadgetCtx igoperators.GadgetContext, innerMaps *sync
 		return
 	}
 
+	// Remove mntns_id from expected_hashes BPF map
 	outerMapVar, ok := gadgetCtx.GetVar(expectedHashesMapName)
 	if !ok {
 		return
@@ -279,13 +361,37 @@ func handleContainerRemoved(gadgetCtx igoperators.GadgetContext, innerMaps *sync
 		slog.Debug("Failed to delete entry from expected_hashes", "mntns_id", mntnsID, "error", err)
 	}
 
-	if val, loaded := innerMaps.LoadAndDelete(mntnsID); loaded {
-		if m, ok := val.(*ebpf.Map); ok && m != nil {
-			m.Close()
-		}
+	// Decrement ref count; close inner map when last container is removed
+	dt.mu.Lock()
+	digest, ok := dt.containerDigests[mntnsID]
+	if !ok {
+		dt.mu.Unlock()
+		return
+	}
+	delete(dt.containerDigests, mntnsID)
+
+	entry, exists := dt.digestEntries[digest]
+	if !exists {
+		dt.mu.Unlock()
+		return
 	}
 
-	slog.Info("Cleaned up expected_hashes for removed container", "mntns_id", mntnsID)
+	entry.refCount--
+	if entry.refCount > 0 {
+		dt.mu.Unlock()
+		slog.Debug("Decremented digest refCount", "digest", digest, "mntns_id", mntnsID, "refCount", entry.refCount)
+		return
+	}
+
+	// Last container using this digest — clean up the inner map.
+	delete(dt.digestEntries, digest)
+	dt.mu.Unlock()
+
+	if entry.innerMap != nil {
+		entry.innerMap.Close()
+	}
+
+	slog.Info("Cleaned up shared inner map for last container", "digest", digest, "mntns_id", mntnsID)
 }
 
 // Event type constants matching include/micromize/event_types.h
