@@ -3,7 +3,7 @@ module github.com/micromize-dev/micromize
 go 1.25.5
 
 require (
-	github.com/cilium/ebpf v0.20.0
+	github.com/cilium/ebpf v0.21.0
 	github.com/cyphar/filepath-securejoin v0.5.1
 	github.com/docker/cli v29.2.0+incompatible
 	github.com/inspektor-gadget/inspektor-gadget v0.49.1
@@ -81,7 +81,7 @@ require (
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
-	github.com/mdlayher/socket v0.4.1 // indirect
+	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/moby v28.5.2+incompatible // indirect
