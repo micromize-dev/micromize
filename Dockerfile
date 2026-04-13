@@ -26,7 +26,7 @@ RUN mkdir -p build/gadgets && \
             build/gadgets/${gadget}.tar; \
     done
 
-FROM --platform=$BUILDPLATFORM golang:1.25.5-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.2-alpine AS builder
 
 ARG IG_VERSION=v0.47.0
 ARG IMAGE_TAG=dev
