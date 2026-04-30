@@ -8,7 +8,7 @@ require (
 	github.com/docker/cli v29.4.1+incompatible
 	github.com/inspektor-gadget/inspektor-gadget v0.51.1
 	github.com/opencontainers/image-spec v1.1.1
-	github.com/quay/claircore v1.5.45
+	github.com/quay/claircore v1.5.52
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sync v0.20.0
