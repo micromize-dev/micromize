@@ -5,7 +5,7 @@ go 1.25.7
 require (
 	github.com/cilium/ebpf v0.21.0
 	github.com/cyphar/filepath-securejoin v0.5.1
-	github.com/docker/cli v29.3.1+incompatible
+	github.com/docker/cli v29.4.1+incompatible
 	github.com/inspektor-gadget/inspektor-gadget v0.51.1
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/quay/claircore v1.5.45
