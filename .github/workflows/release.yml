@@ -39,7 +39,7 @@ jobs:
           fi
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3.5.0
+        uses: sigstore/cosign-installer@v4.1.1
 
       - name: Install ig
         run: |
