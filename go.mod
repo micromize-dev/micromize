@@ -5,13 +5,16 @@ go 1.25.7
 require (
 	github.com/cilium/ebpf v0.21.0
 	github.com/cyphar/filepath-securejoin v0.6.1
-	github.com/docker/cli v29.4.3+incompatible
+	github.com/docker/cli v29.5.2+incompatible
 	github.com/inspektor-gadget/inspektor-gadget v0.51.1
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/quay/claircore v1.5.52
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sync v0.20.0
+	k8s.io/api v0.35.3
+	k8s.io/apimachinery v0.35.3
+	k8s.io/client-go v0.35.3
 	oras.land/oras-go/v2 v2.6.0
 )
 
@@ -154,10 +157,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.35.3 // indirect
-	k8s.io/apimachinery v0.35.3 // indirect
 	k8s.io/cli-runtime v0.35.3 // indirect
-	k8s.io/client-go v0.35.3 // indirect
 	k8s.io/component-base v0.35.3 // indirect
 	k8s.io/cri-api v0.35.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
