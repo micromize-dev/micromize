@@ -96,7 +96,9 @@ make build-all
 make test
 ```
 
+For full development environment setup, kernel prerequisites, audit/enforce mode examples, and troubleshooting, see
+[docs/development.md](docs/development.md).
+
 ## Status
 
 Micromize is under active development. Contributions are welcome.
-
