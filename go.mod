@@ -6,7 +6,7 @@ toolchain go1.26.4
 
 require (
 	github.com/cilium/ebpf v0.21.0
-	github.com/cyphar/filepath-securejoin v0.6.1
+	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/docker/cli v29.6.0+incompatible
 	github.com/inspektor-gadget/inspektor-gadget v0.53.2
 	github.com/opencontainers/image-spec v1.1.1
@@ -21,7 +21,7 @@ require (
 )
 
 require (
-	cyphar.com/go-pathrs v0.2.1 // indirect
+	cyphar.com/go-pathrs v0.2.5 // indirect
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
