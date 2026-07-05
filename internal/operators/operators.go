@@ -76,6 +76,8 @@ const (
 	eventTypeCapModuleAutoload        = 13
 	eventTypeSocketAFKeyCreate        = 14
 	eventTypeSocketXfrmNetlinkCreate  = 15
+	eventTypeSocketFamilyDeniedCreate = 20
+	eventTypeSocketFamilyDeniedBind   = 21
 )
 
 var eventTypeNames = map[uint32]string{
@@ -95,6 +97,8 @@ var eventTypeNames = map[uint32]string{
 	eventTypeCapModuleAutoload:        "module_autoload",
 	eventTypeSocketAFKeyCreate:        "af_key_socket_create",
 	eventTypeSocketXfrmNetlinkCreate:  "xfrm_netlink_socket_create",
+	eventTypeSocketFamilyDeniedCreate: "socket_family_denied_create",
+	eventTypeSocketFamilyDeniedBind:   "socket_family_denied_bind",
 }
 
 // NewEventTypeOperator creates an operator that enriches events with a

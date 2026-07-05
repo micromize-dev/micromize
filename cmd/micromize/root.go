@@ -42,13 +42,32 @@ const (
 )
 
 var (
-	enforce           bool
-	verbose           bool
-	filterNamespaces  string
-	filterImageDigest string
-	disableGadgets    string
-	exemptLabel       string
+	enforce                    bool
+	verbose                    bool
+	filterNamespaces           string
+	filterImageDigest          string
+	disableGadgets             string
+	exemptLabel                string
+	socketDenyFamilies         string
+	socketDenyNetlinkProtocols string
 )
+
+// defaultSocketDenyFamilies is the conservative set of socket address
+// families denied out of the box by the configurable layer of socket-restrict.
+// It targets families that are essentially never used by cloud-native
+// application containers but periodically ship kernel LPEs. AF_ALG, AF_KEY and
+// AF_NETLINK/XFRM are always blocked by the gadget's hardcoded layer and are
+// intentionally omitted here. AF_PACKET (MetalLB, keepalived, tcpdump-in-pod,
+// kube-proxy IPVS, Cilium) and AF_VSOCK (firecracker/kata) are also excluded —
+// operators that want them blocked can opt-in via --socket-deny-families.
+const defaultSocketDenyFamilies = "AF_TIPC,AF_RDS,AF_SMC,AF_CAN,AF_NFC,AF_BLUETOOTH,AF_AX25,AF_ATMPVC,AF_ATMSVC,AF_X25,AF_KCM,AF_CAIF"
+
+// defaultSocketDenyNetlinkProtocols is intentionally empty: blocking
+// NETLINK_NETFILTER would break iptables-nft / nf_tables-based CNI plugins
+// (Istio CNI, kube-proxy nft, etc.). NETLINK_XFRM is already blocked by the
+// gadget's hardcoded layer. Operators concerned about nf_tables LPEs can
+// opt-in via --socket-deny-netlink-protocols=NETLINK_NETFILTER.
+const defaultSocketDenyNetlinkProtocols = ""
 
 var rootCmd = &cobra.Command{
 	Use:   "micromize",
@@ -77,6 +96,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&filterImageDigest, "filter-image-digest", "", "Filter out containers running this image digest from monitoring (e.g. sha256:abc123...)")
 	rootCmd.PersistentFlags().StringVar(&disableGadgets, "disable-gadgets", "", "Comma-separated list of gadgets to disable (e.g. ptrace-restrict,cap-restrict)")
 	rootCmd.PersistentFlags().StringVar(&exemptLabel, "exempt-label", "micromize.dev/exempt", "Kubernetes label key used to mark namespaces as exempt from monitoring (value must be 'true'). Set to empty string to disable. Changes take effect on restart.")
+	rootCmd.PersistentFlags().StringVar(&socketDenyFamilies, "socket-deny-families", defaultSocketDenyFamilies, "Comma-separated list of socket address families denied by socket-restrict's configurable layer. Names (e.g. AF_TIPC) or decimal numbers; case-insensitive. AF_ALG/AF_KEY/XFRM are always blocked regardless. Set to empty string to disable the configurable layer.")
+	rootCmd.PersistentFlags().StringVar(&socketDenyNetlinkProtocols, "socket-deny-netlink-protocols", defaultSocketDenyNetlinkProtocols, "Comma-separated list of additional AF_NETLINK protocols denied by socket-restrict. Defaults to empty (NETLINK_XFRM is always blocked). Use NETLINK_NETFILTER to block nf_tables LPE chains (incompatible with iptables-nft / nf_tables-based CNI).")
 }
 
 func run(ctx context.Context) error {
@@ -122,7 +143,20 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("creating local manager operator: %w", err)
 	}
 
-	contextManager := gadget.NewContextManager([]operators.DataOperator{ociHandlerOp, localManagerOp, eventTypeOp, outputOp})
+	socketDenyFamilyList, err := operators.ParseSocketDenyFamilies(socketDenyFamilies)
+	if err != nil {
+		return fmt.Errorf("parsing --socket-deny-families: %w", err)
+	}
+	socketDenyNetlinkProtocolList, err := operators.ParseSocketDenyNetlinkProtocols(socketDenyNetlinkProtocols)
+	if err != nil {
+		return fmt.Errorf("parsing --socket-deny-netlink-protocols: %w", err)
+	}
+	slog.Info("Socket-restrict deny-list",
+		"families", socketDenyFamilyList,
+		"netlinkProtocols", socketDenyNetlinkProtocolList)
+	socketRestrictOp := operators.NewSocketRestrictOperator(socketDenyFamilyList, socketDenyNetlinkProtocolList)
+
+	contextManager := gadget.NewContextManager([]operators.DataOperator{ociHandlerOp, localManagerOp, socketRestrictOp, eventTypeOp, outputOp})
 
 	// Create gadget registry
 	registry := gadget.NewRegistry(contextManager, runtimeManager)

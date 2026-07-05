@@ -18,6 +18,9 @@ datasources:
       family:
         annotations:
           description: Socket address family
+      protocol:
+        annotations:
+          description: Socket protocol (e.g. NETLINK_XFRM for AF_NETLINK)
       process:
         annotations:
           description: The process attempting a restricted socket operation
