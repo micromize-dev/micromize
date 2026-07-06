@@ -7,7 +7,7 @@ toolchain go1.26.4
 require (
 	github.com/cilium/ebpf v0.21.0
 	github.com/cyphar/filepath-securejoin v0.6.1
-	github.com/docker/cli v29.6.0+incompatible
+	github.com/docker/cli v29.6.1+incompatible
 	github.com/inspektor-gadget/inspektor-gadget v0.53.2
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/quay/claircore v1.5.52
