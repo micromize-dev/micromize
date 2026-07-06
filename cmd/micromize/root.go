@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -217,12 +218,21 @@ func run(ctx context.Context) error {
 	}
 
 	// Run all gadgets
-	if err := registry.RunAll(ctx); err != nil {
+	g, err := registry.RunAll(ctx)
+	if err != nil {
 		return fmt.Errorf("running gadgets: %w", err)
 	}
 
-	// Wait for context to be done (which happens on signal)
-	<-ctx.Done()
+	// Wait for all gadgets to complete.
+	// On graceful shutdown (signal), context is canceled and gadgets stop.
+	// If a gadget fails unexpectedly, errgroup cancels the context, stopping the rest.
+	if err := g.Wait(); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil
+		}
+		return fmt.Errorf("gadget error: %w", err)
+	}
+
 	return nil
 }
 
